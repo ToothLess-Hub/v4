@@ -1,0 +1,536 @@
+local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/HoshinoKotaSouma/Fluent-UI/refs/heads/main/LC"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "Bacon Hub " .. Fluent.Version,
+    SubTitle = "by Rin",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true, -- The blur may be detectable, setting this to false disables blur entirely
+    Theme = "Balloon",
+    MinimizeKey = Enum.KeyCode.LeftControl -- Used when theres no MinimizeKeybind
+})
+
+--Fluent provides Lucide Icons https://lucide.dev/icons/ for the tabs, icons are optional
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = ""}),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" }),
+    Universal = Window:AddTab({ Title = "Universal", Icon = "globe" })
+}
+
+local Options = Fluent.Options
+
+do
+    Fluent:Notify({
+        Title = "Notification",
+        Content = "Thanks to use my script",
+        SubContent = "Messages from Rin", -- Optional
+        Duration = 5 -- Set to nil to make the notification not disappear
+    })
+
+
+
+    Tabs.Main:AddParagraph({
+        Title = "Paragraph",
+        Content = "This is a paragraph.\nSecond line!"
+    })
+
+
+
+    Tabs.Main:AddButton({
+        Title = "Button",
+        Description = "Very important button",
+        Callback = function()
+            Window:Dialog({
+                Title = "Title",
+                Content = "This is a dialog",
+                Buttons = {
+                    {
+                        Title = "Confirm",
+                        Callback = function()
+                            print("Confirmed the dialog.")
+                        end
+                    },
+                    {
+                        Title = "Cancel",
+                        Callback = function()
+                            print("Cancelled the dialog.")
+                        end
+                    }
+                }
+            })
+        end
+    })
+
+
+
+    local teleportConnection
+    local teleportEnabled = false
+    local initialized = false  -- Cờ để biết GUI đã load xong chưa
+    
+    local Toggle = Tabs.Universal:AddToggle("MyToggle", {
+        Title = "Teleport Click",
+        Description = "Sử dụng chuột phải",
+        Default = false
+    })
+    
+    Toggle:OnChanged(function()
+        -- Bỏ qua mọi thông báo trước khi initialized = true
+        if not initialized then
+            return
+        end
+    
+        local player = game.Players.LocalPlayer
+        local mouse = player:GetMouse()
+    
+        if Options.MyToggle.Value then
+            teleportEnabled = true
+    
+            if not teleportConnection then
+                teleportConnection = mouse.Button2Down:Connect(function()
+                    if teleportEnabled and mouse.Target then
+                        local character = player.Character
+                        if character and character:FindFirstChild("HumanoidRootPart") then
+                            character.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.p + Vector3.new(0, 3, 0))
+                        end
+                    end
+                end)
+            end
+    
+            Fluent:Notify({
+                Title = "Notification",
+                Content = "Teleport Click is on",
+                Duration = 5
+            })
+    
+        else
+            teleportEnabled = false
+    
+            if teleportConnection then
+                teleportConnection:Disconnect()
+                teleportConnection = nil
+            end
+    
+            Fluent:Notify({
+                Title = "Notification",
+                Content = "Teleport Click is off",
+                Duration = 5
+            })
+        end
+    end)
+    
+    -- Đặt giá trị mặc định toggle xong, rồi bật cờ initialized sau
+    Options.MyToggle:SetValue(false)
+    initialized = true
+    
+    
+    -- esp
+--// Dịch vụ
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+--// Biến quản lý
+local espEnabled = false
+local highlights = {}
+
+--// Tạo Highlight
+local function createHighlight(player)
+    if player == LocalPlayer then return end
+    if not player.Character then return end
+    if highlights[player] then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESPHighlight"
+    highlight.Adornee = player.Character
+    highlight.FillTransparency = 1 -- Không đổ màu
+    highlight.OutlineTransparency = 0
+    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+    highlight.Parent = player.Character
+
+    highlights[player] = highlight
+end
+
+--// Xóa Highlight
+local function removeHighlight(player)
+    if highlights[player] then
+        highlights[player]:Destroy()
+        highlights[player] = nil
+    end
+end
+
+--// Cập nhật cho 1 player
+local function updatePlayer(player)
+    if player == LocalPlayer then return end
+
+    local function onCharacterAdded(char)
+        task.wait(0.5)
+        if espEnabled then
+            removeHighlight(player) -- Xoá cũ nếu có
+            createHighlight(player)
+        end
+    end
+
+    if player.Character then
+        onCharacterAdded(player.Character)
+    end
+
+    player.CharacterAdded:Connect(onCharacterAdded)
+end
+
+--// Theo dõi tất cả player
+local function setupESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        updatePlayer(player)
+    end
+
+    Players.PlayerAdded:Connect(updatePlayer)
+end
+
+--// Tự động cập nhật nếu bật ESP
+RunService.RenderStepped:Connect(function()
+    if espEnabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                if not highlights[player] or not player.Character:FindFirstChild("ESPHighlight") then
+                    createHighlight(player)
+                end
+            end
+        end
+    end
+end)
+
+--// Toggle trong Fluent UI
+Tabs.Universal:AddToggle("ESPOutline", {
+    Title = "ESP Outline",
+    Description = "Hiển thị viền quanh tất cả người chơi",
+    Default = false,
+    Callback = function(state)
+        espEnabled = state
+
+        if state then
+            setupESP()
+        else
+            for _, highlight in pairs(highlights) do
+                if highlight then highlight:Destroy() end
+            end
+            highlights = {}
+        end
+    end
+})
+
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Cấu hình
+local MIN_ACTION_INTERVAL = 1         -- Giây tối thiểu giữa các thao tác
+local MAX_ACTIONS_PER_MIN = 60        -- Tối đa hành động trong 60 giây
+local SEVERE_THRESHOLD = 100          -- Ngưỡng hành vi nghiêm trọng
+local BLOCK_DURATION = 10             -- Khoá tạm thời
+local SEVERE_ACTION_DURATION = 999    -- Không dùng nữa, nhưng giữ để tránh lỗi
+
+-- Biến trạng thái
+local actionCount = 0
+local lastAction = 0
+local lastReset = tick()
+local tempBlocked = false
+local severeTriggered = false
+
+-- Xử lý phản ứng theo cấp độ, không hiện thông báo
+local function handleAbnormal(level)
+    if level == 1 then
+        task.wait(2) -- Delay nhẹ
+
+    elseif level == 2 and not tempBlocked then
+        tempBlocked = true
+        task.delay(BLOCK_DURATION, function()
+            tempBlocked = false
+        end)
+
+    elseif level == 3 and not severeTriggered then
+        severeTriggered = true
+        if Fluent and Fluent.ScreenGui then
+            Fluent.ScreenGui.Enabled = false
+        end
+        script:Destroy()
+    end
+end
+
+-- Kiểm tra spam/thao tác quá nhanh
+local function shouldBlock()
+    local now = tick()
+
+    if now - lastReset > 60 then
+        actionCount = 0
+        lastReset = now
+    end
+
+    if now - lastAction < MIN_ACTION_INTERVAL then
+        handleAbnormal(1)
+        return true
+    end
+
+    lastAction = now
+    actionCount += 1
+
+    if actionCount >= SEVERE_THRESHOLD then
+        handleAbnormal(3)
+        return true
+    elseif actionCount >= MAX_ACTIONS_PER_MIN then
+        handleAbnormal(2)
+        return true
+    end
+
+    return tempBlocked
+end
+
+-- Theo dõi phím bấm
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        shouldBlock()
+    end
+end)
+
+-- Theo dõi mỗi frame (phòng nền)
+RunService.Heartbeat:Connect(function()
+    if shouldBlock() then return end
+end)
+
+    
+local lighting = game:GetService("Lighting")
+
+local Slider = Tabs.Universal:AddSlider("BrightnessSlider", {
+    Title = "Map sáng",
+    Description = "Kéo thanh để chọn độ sáng bạn thích",
+    Default = lighting.Brightness, -- hoặc số mặc định ví dụ 2
+    Min = 1.5,
+    Max = 50,
+    Rounding = 1,
+
+    Callback = function(Value)
+        lighting.Brightness = Value
+    end
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local Humanoid, HRP
+
+-- Trạng thái điều khiển
+local isFollowing = false
+local targetPlayerName = ""
+
+-- UI Fluent
+local TargetInput = Tabs.Universal:AddInput("TargetPlayerInput", {
+    Title = "Tên mục tiêu",
+    Description = "Người chơi cần bám sát",
+    Placeholder = "Nhập tên...",
+    Callback = function(val)
+        targetPlayerName = val
+    end
+})
+
+local ToggleFollow = Tabs.Universal:AddToggle("FollowToggle", {
+    Title = "Bám sát mục tiêu",
+    Description = "Tự động bám sát mục tiêu không ngừng",
+    Default = false,
+    Callback = function(state)
+        isFollowing = state
+    end
+})
+
+-- Lấy Humanoid và HRP của người dùng (LocalPlayer)
+local function getMyInfo()
+    local char = LocalPlayer.Character
+    if char then
+        return char:FindFirstChild("Humanoid"), char:FindFirstChild("HumanoidRootPart")
+    end
+end
+
+-- Lấy HRP của mục tiêu
+local function getTargetHRP()
+    local target = Players:FindFirstChild(targetPlayerName)
+    if target and target.Character then
+        return target.Character:FindFirstChild("HumanoidRootPart")
+    end
+end
+
+-- Bám sát mục tiêu mỗi frame
+RunService.Heartbeat:Connect(function()
+    if not isFollowing then return end
+
+    Humanoid, HRP = getMyInfo()
+    local targetHRP = getTargetHRP()
+    if not Humanoid or not HRP or not targetHRP then return end
+
+    local followOffset = CFrame.new(0, 0, 2) -- vị trí cách sau lưng mục tiêu
+    local desiredPos = targetHRP.CFrame * followOffset
+    HRP.CFrame = CFrame.new(desiredPos.Position, targetHRP.Position)
+end)
+
+    local Dropdown = Tabs.Main:AddDropdown("Dropdown", {
+        Title = "Dropdown",
+        Values = {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen"},
+        Multi = false,
+        Default = 1,
+    })
+
+    Dropdown:SetValue("four")
+
+    Dropdown:OnChanged(function(Value)
+        print("Dropdown changed:", Value)
+    end)
+
+
+    
+    local MultiDropdown = Tabs.Main:AddDropdown("MultiDropdown", {
+        Title = "Dropdown",
+        Description = "You can select multiple values.",
+        Values = {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen"},
+        Multi = true,
+        Default = {"seven", "twelve"},
+    })
+
+    MultiDropdown:SetValue({
+        three = true,
+        five = true,
+        seven = false
+    })
+
+    MultiDropdown:OnChanged(function(Value)
+        local Values = {}
+        for Value, State in next, Value do
+            table.insert(Values, Value)
+        end
+        print("Mutlidropdown changed:", table.concat(Values, ", "))
+    end)
+
+
+
+    local Colorpicker = Tabs.Main:AddColorpicker("Colorpicker", {
+        Title = "Colorpicker",
+        Default = Color3.fromRGB(96, 205, 255)
+    })
+
+    Colorpicker:OnChanged(function()
+        print("Colorpicker changed:", Colorpicker.Value)
+    end)
+    
+    Colorpicker:SetValueRGB(Color3.fromRGB(0, 255, 140))
+
+
+
+    local TColorpicker = Tabs.Main:AddColorpicker("TransparencyColorpicker", {
+        Title = "Colorpicker",
+        Description = "but you can change the transparency.",
+        Transparency = 0,
+        Default = Color3.fromRGB(96, 205, 255)
+    })
+
+    TColorpicker:OnChanged(function()
+        print(
+            "TColorpicker changed:", TColorpicker.Value,
+            "Transparency:", TColorpicker.Transparency
+        )
+    end)
+
+
+
+    local Keybind = Tabs.Main:AddKeybind("Keybind", {
+        Title = "KeyBind",
+        Mode = "Toggle", -- Always, Toggle, Hold
+        Default = "LeftControl", -- String as the name of the keybind (MB1, MB2 for mouse buttons)
+
+        -- Occurs when the keybind is clicked, Value is `true`/`false`
+        Callback = function(Value)
+            print("Keybind clicked!", Value)
+        end,
+
+        -- Occurs when the keybind itself is changed, `New` is a KeyCode Enum OR a UserInputType Enum
+        ChangedCallback = function(New)
+            print("Keybind changed!", New)
+        end
+    })
+
+    -- OnClick is only fired when you press the keybind and the mode is Toggle
+    -- Otherwise, you will have to use Keybind:GetState()
+    Keybind:OnClick(function()
+        print("Keybind clicked:", Keybind:GetState())
+    end)
+
+    Keybind:OnChanged(function()
+        print("Keybind changed:", Keybind.Value)
+    end)
+
+    task.spawn(function()
+        while true do
+            wait(1)
+
+            -- example for checking if a keybind is being pressed
+            local state = Keybind:GetState()
+            if state then
+                print("Keybind is being held down")
+            end
+
+            if Fluent.Unloaded then break end
+        end
+    end)
+
+    Keybind:SetValue("MB2", "Toggle") -- Sets keybind to MB2, mode to Hold
+
+
+    local Input = Tabs.Main:AddInput("Input", {
+        Title = "Input",
+        Default = "Default",
+        Placeholder = "Placeholder",
+        Numeric = false, -- Only allows numbers
+        Finished = false, -- Only calls callback when you press enter
+        Callback = function(Value)
+            print("Input changed:", Value)
+        end
+    })
+
+    Input:OnChanged(function()
+        print("Input updated:", Input.Value)
+    end)
+end
+
+
+-- Addons:
+-- SaveManager (Allows you to have a configuration system)
+-- InterfaceManager (Allows you to have a interface managment system)
+
+-- Hand the library over to our managers
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+
+-- Ignore keys that are used by ThemeManager.
+-- (we dont want configs to save themes, do we?)
+SaveManager:IgnoreThemeSettings()
+
+-- You can add indexes of elements the save manager should ignore
+SaveManager:SetIgnoreIndexes({})
+
+-- use case for doing it this way:
+-- a script hub could have themes in a global folder
+-- and game configs in a separate folder per game
+InterfaceManager:SetFolder("FluentScriptHub")
+SaveManager:SetFolder("FluentScriptHub/specific-game")
+
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+
+Window:SelectTab(1)
+
+
+-- You can use the SaveManager:LoadAutoloadConfig() to load a config
+-- which has been marked to be one that auto loads!
+SaveManager:LoadAutoloadConfig()
