@@ -1,0 +1,329 @@
+local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/HoshinoKotaSouma/Fluent-UI/refs/heads/main/LC"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+-- =============================================
+-- HỆ THỐNG ĐA NGÔN NGỮ
+-- =============================================
+local Translations = {
+    English = {
+        window_title = "Bacon Hub " .. Fluent.Version,
+        window_subtitle = "by Rin",
+        tab_main = "Main",
+        tab_settings = "Settings",
+        tab_universal = "Universal",
+        notify_welcome = "Thanks for using my script",
+        notify_welcome_sub = "Messages from Rin",
+        notify_lang_changed = "Language changed to English",
+        notify_teleport_on = "Teleport Click enabled",
+        notify_teleport_off = "Teleport Click disabled",
+        paragraph_title = "Paragraph",
+        paragraph_content = "This is a paragraph.\nSecond line!",
+        button_title = "Button",
+        button_desc = "Very important button",
+        dialog_title = "Title",
+        dialog_content = "This is a dialog",
+        dialog_confirm = "Confirm",
+        dialog_cancel = "Cancel",
+        teleport_title = "Teleport Click",
+        teleport_desc = "Use right mouse button",
+        esp_title = "ESP Outline",
+        esp_desc = "Recommended to turn on graphics quality 2 will esp all players.",
+        brightness_title = "Map Brightness",
+        brightness_desc = "Drag to adjust brightness",
+        follow_title = "Follow Target",
+        follow_desc = "Automatically follow target",
+        target_title = "Target Name",
+        target_placeholder = "Enter name...",
+        lang_title = "Switch Language",
+        lang_desc = "English/Vietnamese"
+    },
+    Vietnamese = {
+        window_title = "Bacon Hub " .. Fluent.Version,
+        window_subtitle = "bởi Rin",
+        tab_main = "Chính",
+        tab_settings = "Cài đặt",
+        tab_universal = "Toàn cục",
+        notify_welcome = "Cảm ơn đã sử dụng script của tôi",
+        notify_welcome_sub = "Tin nhắn từ Rin",
+        notify_lang_changed = "Đã đổi ngôn ngữ sang Tiếng Việt",
+        notify_teleport_on = "Bật dịch chuyển bằng chuột",
+        notify_teleport_off = "Tắt dịch chuyển bằng chuột",
+        paragraph_title = "Đoạn văn",
+        paragraph_content = "Đây là đoạn văn.\nDòng thứ hai!",
+        button_title = "Nút bấm",
+        button_desc = "Nút rất quan trọng",
+        dialog_title = "Tiêu đề",
+        dialog_content = "Đây là hộp thoại",
+        dialog_confirm = "Xác nhận",
+        dialog_cancel = "Huỷ",
+        teleport_title = "Dịch chuyển chuột",
+        teleport_desc = "Sử dụng chuột phải",
+        esp_title = "Esp",
+        esp_desc = "Khuyến khích bật chất lượng đồ họa 2 sẽ esp mọi người chơi.",
+        brightness_title = "Độ sáng bản đồ",
+        brightness_desc = "Kéo để điều chỉnh độ sáng",
+        follow_title = "Bám theo mục tiêu",
+        follow_desc = "Tự động bám theo mục tiêu",
+        target_title = "Tên mục tiêu",
+        target_placeholder = "Nhập tên...",
+        lang_title = "Đổi ngôn ngữ",
+        lang_desc = "Tiếng Anh/Tiếng Việt"
+    }
+}
+
+local currentLanguage = "Vietnamese"
+local function T(key)
+    return Translations[currentLanguage][key] or key
+end
+
+-- =============================================
+-- MAIN GUI
+-- =============================================
+local Window = Fluent:CreateWindow({
+    Title = T("window_title"),
+    SubTitle = T("window_subtitle"),
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Balloon",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+-- Lưu trữ các thành phần UI cần cập nhật
+local UIComponents = {
+    Tabs = {
+        Main = Window:AddTab({ Title = T("tab_main"), Icon = "" }),
+        Settings = Window:AddTab({ Title = T("tab_settings"), Icon = "settings" }),
+        Universal = Window:AddTab({ Title = T("tab_universal"), Icon = "globe" })
+    },
+    Options = Fluent.Options
+}
+
+-- Thông báo chào mừng
+Fluent:Notify({
+    Title = "Notification",
+    Content = T("notify_welcome"),
+    SubContent = T("notify_welcome_sub"),
+    Duration = 5
+})
+
+-- =============================================
+-- UNIVERSAL TAB CONTROLS
+-- =============================================
+
+-- TELEPORT CLICK
+local teleportConnection
+local teleportEnabled = false
+
+UIComponents.TeleportToggle = UIComponents.Tabs.Universal:AddToggle("TeleportToggle", {
+    Title = T("teleport_title"),
+    Description = T("teleport_desc"),
+    Default = false
+})
+
+UIComponents.TeleportToggle:OnChanged(function(value)
+    teleportEnabled = value
+    local player = game.Players.LocalPlayer
+    
+    if teleportEnabled then
+        teleportConnection = game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+            if not gameProcessed and input.UserInputType == Enum.UserInputType.MouseButton2 then
+                local mouse = player:GetMouse()
+                local character = player.Character
+                if character and character:FindFirstChild("HumanoidRootPart") then
+                    character.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 3, 0))
+                end
+            end
+        end)
+        Fluent:Notify({
+            Title = "Notification",
+            Content = T("notify_teleport_on"),
+            Duration = 3
+        })
+    else
+        if teleportConnection then
+            teleportConnection:Disconnect()
+            teleportConnection = nil
+        end
+        Fluent:Notify({
+            Title = "Notification",
+            Content = T("notify_teleport_off"),
+            Duration = 3
+        })
+    end
+end)
+
+-- ESP OUTLINE
+local espEnabled = false
+local highlights = {}
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+local function updateESP()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            if espEnabled then
+                if not highlights[player] and player.Character then
+                    local highlight = Instance.new("Highlight")
+                    highlight.Name = "ESP_"..player.Name
+                    highlight.Adornee = player.Character
+                    highlight.FillTransparency = 1
+                    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+                    highlight.Parent = player.Character
+                    highlights[player] = highlight
+                end
+            else
+                if highlights[player] then
+                    highlights[player]:Destroy()
+                    highlights[player] = nil
+                end
+            end
+        end
+    end
+end
+
+UIComponents.ESPToggle = UIComponents.Tabs.Universal:AddToggle("ESPToggle", {
+    Title = T("esp_title"),
+    Description = T("esp_desc"),
+    Default = false,
+    Callback = function(value)
+        espEnabled = value
+        updateESP()
+    end
+})
+
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(character)
+        if espEnabled then
+            task.wait(1)
+            updateESP()
+        end
+    end)
+end)
+
+-- FOLLOW TARGET
+local isFollowing = false
+local targetPlayerName = ""
+local followConnection
+
+UIComponents.TargetInput = UIComponents.Tabs.Universal:AddInput("TargetInput", {
+    Title = T("target_title"),
+    Description = T("follow_desc"),
+    Placeholder = T("target_placeholder"),
+    Callback = function(value)
+        targetPlayerName = value
+    end
+})
+
+UIComponents.FollowToggle = UIComponents.Tabs.Universal:AddToggle("FollowToggle", {
+    Title = T("follow_title"),
+    Description = T("follow_desc"),
+    Default = false,
+    Callback = function(value)
+        isFollowing = value
+        
+        if followConnection then
+            followConnection:Disconnect()
+            followConnection = nil
+        end
+        
+        if isFollowing then
+            followConnection = RunService.Heartbeat:Connect(function()
+                local targetPlayer = Players:FindFirstChild(targetPlayerName)
+                local myCharacter = LocalPlayer.Character
+                
+                if targetPlayer and targetPlayer.Character and myCharacter then
+                    local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    local myRoot = myCharacter:FindFirstChild("HumanoidRootPart")
+                    
+                    if targetRoot and myRoot then
+                        myRoot.CFrame = CFrame.new(targetRoot.Position + (targetRoot.CFrame.LookVector * -3), targetRoot.Position)
+                    end
+                end
+            end)
+        end
+    end
+})
+
+-- MAP BRIGHTNESS
+local lighting = game:GetService("Lighting")
+UIComponents.BrightnessSlider = UIComponents.Tabs.Universal:AddSlider("BrightnessSlider", {
+    Title = T("brightness_title"),
+    Description = T("brightness_desc"),
+    Default = lighting.Brightness,
+    Min = 1,
+    Max = 10,
+    Rounding = 1,
+    Callback = function(value)
+        lighting.Brightness = value
+    end
+})
+
+-- =============================================
+-- SETTINGS TAB - LANGUAGE SWITCHER (ĐÃ SỬA)
+-- =============================================
+local function updateAllUI()
+    -- Cập nhật window title và subtitle
+    Window.Title = T("window_title")
+    Window.SubTitle = T("window_subtitle")
+    
+    -- Cập nhật tab titles
+    for tabName, tab in pairs(UIComponents.Tabs) do
+        if tab then
+            tab.Title = T("tab_"..tabName:lower())
+        end
+    end
+    
+    -- Cập nhật các controls trong Universal tab
+    if UIComponents.TeleportToggle then
+        UIComponents.TeleportToggle.Title = T("teleport_title")
+        UIComponents.TeleportToggle.Description = T("teleport_desc")
+    end
+    
+    if UIComponents.ESPToggle then
+        UIComponents.ESPToggle.Title = T("esp_title")
+        UIComponents.ESPToggle.Description = T("esp_desc")
+    end
+    
+    if UIComponents.BrightnessSlider then
+        UIComponents.BrightnessSlider.Title = T("brightness_title")
+        UIComponents.BrightnessSlider.Description = T("brightness_desc")
+    end
+    
+    if UIComponents.FollowToggle then
+        UIComponents.FollowToggle.Title = T("follow_title")
+        UIComponents.FollowToggle.Description = T("follow_desc")
+    end
+    
+    if UIComponents.TargetInput then
+        UIComponents.TargetInput.Title = T("target_title")
+        UIComponents.TargetInput.Description = T("follow_desc")
+        UIComponents.TargetInput.Placeholder = T("target_placeholder")
+    end
+end
+
+
+-- =============================================
+-- SAVE MANAGER
+-- =============================================
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:SetFolder("FluentScriptHub")
+SaveManager:SetFolder("FluentScriptHub/specific-game")
+InterfaceManager:BuildInterfaceSection(UIComponents.Tabs.Settings)
+SaveManager:BuildConfigSection(UIComponents.Tabs.Settings)
+
+Window:SelectTab(1)
+SaveManager:LoadAutoloadConfig()
+
+-- Khởi tạo ESP nếu cần
+task.spawn(function()
+    task.wait(2)
+    if espEnabled then
+        updateESP()
+    end
+end)
